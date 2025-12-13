@@ -13,7 +13,7 @@ setup(
     description="一键部署 VLESS-Reality + IKEv2 VPN 的综合代理工具",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jerry/nexus-vpn",
+    url="https://github.com/alphajc/nexus-vpn",
     packages=find_packages(exclude=["tests", "tests.*"]),
     classifiers=[
         "Development Status :: 4 - Beta",

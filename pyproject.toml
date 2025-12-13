@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus-vpn"
-version = "0.1.0"
+version = "0.1.2"
 description = "一键部署 VLESS-Reality + IKEv2 VPN 的综合代理工具"
 readme = "README.md"
 license = "MIT"
@@ -35,9 +35,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jerry/nexus-vpn"
-Repository = "https://github.com/jerry/nexus-vpn"
-Issues = "https://github.com/jerry/nexus-vpn/issues"
+Homepage = "https://github.com/alphajc/nexus-vpn"
+Repository = "https://github.com/alphajc/nexus-vpn"
+Issues = "https://github.com/alphajc/nexus-vpn/issues"
 
 [project.scripts]
 nexus-vpn = "nexus_vpn.cli:cli"

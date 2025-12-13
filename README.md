@@ -1,5 +1,8 @@
 # Nexus-VPN
 
+[![Publish to PyPI](https://github.com/alphajc/nexus-vpn/actions/workflows/python-publish.yml/badge.svg)](https://github.com/alphajc/nexus-vpn/actions/workflows/python-publish.yml)
+[![PyPI version](https://img.shields.io/pypi/v/nexus-vpn)](https://pypi.org/project/nexus-vpn/)
+
 一键部署 **VLESS-Reality** + **IKEv2** VPN 的综合代理工具。
 
 ## 功能特性
