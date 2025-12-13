@@ -101,6 +101,17 @@ nexus-vpn install --domain <域名/IP> [--proto vless] [--reality-dest <目标�
 - **Windows**: 手动配置 IKEv2 VPN
 - **Android**: strongSwan VPN Client
 
+## 文档
+
+详细文档请参阅 [docs](./docs/) 目录：
+
+- [文档首页](./docs/index.md) - 功能概述与快速开始
+- [安装指南](./docs/installation.md) - 系统要求、部署步骤
+- [用户管理](./docs/user-management.md) - 用户添加、删除、列出
+- [客户端配置](./docs/client-configuration.md) - 各平台客户端配置方法
+- [命令参考](./docs/command-reference.md) - CLI 命令详细说明
+- [故障排除](./docs/troubleshooting.md) - 常见问题诊断与解决
+
 ## 许可证
 
 MIT License
