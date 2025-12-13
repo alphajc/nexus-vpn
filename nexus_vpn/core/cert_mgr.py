@@ -1,64 +1,142 @@
 import os
+import re
+import secrets
 import subprocess
+import shutil
 from nexus_vpn.utils.logger import log
 
 class CertManager:
     PKI_DIR = "/etc/nexus-vpn/pki"
+    P12_PASSWORD = os.environ.get("NEXUS_P12_PASSWORD", "nexusvpn")
     
     @staticmethod
-    def run_pki(cmd):
-        subprocess.check_call(f"ipsec pki {cmd}", shell=True, stderr=subprocess.DEVNULL)
+    def _validate_name(name):
+        """验证域名或用户名，防止命令注入"""
+        if not name or not re.match(r'^[a-zA-Z0-9._-]+$', name):
+            raise ValueError(f"无效的名称: {name}")
+        return name
 
     @staticmethod
     def setup_ca(domain):
-        if os.path.exists(f"{CertManager.PKI_DIR}/ca.crt"): return
+        domain = CertManager._validate_name(domain)
+        if os.path.exists(f"{CertManager.PKI_DIR}/ca.crt"):
+            return
         
         os.makedirs(f"{CertManager.PKI_DIR}/private", exist_ok=True)
         os.makedirs(f"{CertManager.PKI_DIR}/certs", exist_ok=True)
         
         log.info("生成 CA 与服务器证书...")
-        # CA
-        CertManager.run_pki(f"--gen --type rsa --size 4096 --outform pem > {CertManager.PKI_DIR}/private/ca.key")
-        CertManager.run_pki(f"--self --ca --lifetime 3650 --in {CertManager.PKI_DIR}/private/ca.key --type rsa --dn \"CN=NexusVPN Root CA\" --outform pem > {CertManager.PKI_DIR}/ca.crt")
         
-        # Server
-        CertManager.run_pki(f"--gen --type rsa --size 4096 --outform pem > {CertManager.PKI_DIR}/private/server.key")
-        CertManager.run_pki(f"--pub --in {CertManager.PKI_DIR}/private/server.key --type rsa | ipsec pki --issue --lifetime 3650 --cacert {CertManager.PKI_DIR}/ca.crt --cakey {CertManager.PKI_DIR}/private/ca.key --dn \"CN={domain}\" --san=\"{domain}\" --flag serverAuth --flag ikeIntermediate --outform pem > {CertManager.PKI_DIR}/certs/server.crt")
+        ca_key = f"{CertManager.PKI_DIR}/private/ca.key"
+        ca_crt = f"{CertManager.PKI_DIR}/ca.crt"
+        server_key = f"{CertManager.PKI_DIR}/private/server.key"
+        server_crt = f"{CertManager.PKI_DIR}/certs/server.crt"
+        
+        # CA Key
+        with open(ca_key, "w") as f:
+            subprocess.run(
+                ["ipsec", "pki", "--gen", "--type", "rsa", "--size", "4096", "--outform", "pem"],
+                stdout=f, check=True
+            )
+        
+        # CA Cert
+        with open(ca_key, "r") as key_in, open(ca_crt, "w") as crt_out:
+            subprocess.run(
+                ["ipsec", "pki", "--self", "--ca", "--lifetime", "3650",
+                 "--in", "/dev/stdin", "--type", "rsa",
+                 "--dn", "CN=NexusVPN Root CA", "--outform", "pem"],
+                stdin=key_in, stdout=crt_out, check=True
+            )
+        
+        # Server Key
+        with open(server_key, "w") as f:
+            subprocess.run(
+                ["ipsec", "pki", "--gen", "--type", "rsa", "--size", "4096", "--outform", "pem"],
+                stdout=f, check=True
+            )
+        
+        # Server Cert (需要管道，使用两步)
+        pub_key_proc = subprocess.run(
+            ["ipsec", "pki", "--pub", "--in", server_key, "--type", "rsa"],
+            capture_output=True, check=True
+        )
+        with open(server_crt, "w") as f:
+            subprocess.run(
+                ["ipsec", "pki", "--issue", "--lifetime", "3650",
+                 "--cacert", ca_crt, "--cakey", ca_key,
+                 "--dn", f"CN={domain}", f"--san={domain}",
+                 "--flag", "serverAuth", "--flag", "ikeIntermediate", "--outform", "pem"],
+                input=pub_key_proc.stdout, stdout=f, check=True
+            )
         
         # Link to StrongSwan
-        subprocess.run(f"cp {CertManager.PKI_DIR}/ca.crt /etc/ipsec.d/cacerts/", shell=True)
-        subprocess.run(f"cp {CertManager.PKI_DIR}/certs/server.crt /etc/ipsec.d/certs/", shell=True)
-        subprocess.run(f"cp {CertManager.PKI_DIR}/private/server.key /etc/ipsec.d/private/", shell=True)
+        os.makedirs("/etc/ipsec.d/cacerts", exist_ok=True)
+        os.makedirs("/etc/ipsec.d/certs", exist_ok=True)
+        os.makedirs("/etc/ipsec.d/private", exist_ok=True)
+        shutil.copy(ca_crt, "/etc/ipsec.d/cacerts/")
+        shutil.copy(server_crt, "/etc/ipsec.d/certs/")
+        shutil.copy(server_key, "/etc/ipsec.d/private/")
 
     @staticmethod
     def issue_user_cert(username):
+        username = CertManager._validate_name(username)
         user_key = f"{CertManager.PKI_DIR}/private/{username}.key"
         user_crt = f"{CertManager.PKI_DIR}/certs/{username}.crt"
         p12_path = f"{CertManager.PKI_DIR}/certs/{username}.p12"
+        ca_key = f"{CertManager.PKI_DIR}/private/ca.key"
+        ca_crt = f"{CertManager.PKI_DIR}/ca.crt"
         
-        # 强制清理旧文件，确保生成新的
-        if os.path.exists(user_key): os.remove(user_key)
-        if os.path.exists(user_crt): os.remove(user_crt)
-        if os.path.exists(p12_path): os.remove(p12_path)
+        # 强制清理旧文件
+        for f in [user_key, user_crt, p12_path]:
+            if os.path.exists(f):
+                os.remove(f)
         
-        # 1. 生成 Key 和 Cert (ClientAuth)
-        CertManager.run_pki(f"--gen --type rsa --size 2048 --outform pem > {user_key}")
-        CertManager.run_pki(f"--pub --in {user_key} --type rsa | ipsec pki --issue --lifetime 3650 --cacert {CertManager.PKI_DIR}/ca.crt --cakey {CertManager.PKI_DIR}/private/ca.key --dn \"CN={username}\" --san=\"{username}\" --flag clientAuth --outform pem > {user_crt}")
+        # 1. 生成用户 Key
+        with open(user_key, "w") as f:
+            subprocess.run(
+                ["ipsec", "pki", "--gen", "--type", "rsa", "--size", "2048", "--outform", "pem"],
+                stdout=f, check=True
+            )
         
-        # 2. 导出 P12 (关键修复: 尝试使用 -legacy，如果失败则回退到默认)
-        # OpenSSL 3 需要 -legacy 才能让 macOS 识别 P12
-        # -passout pass:nexusvpn 固定密码，防止安装时弹窗问密码
-        cmd = f"openssl pkcs12 -export -legacy -inkey {user_key} -in {user_crt} -name \"{username}\" -certfile {CertManager.PKI_DIR}/ca.crt -caname \"NexusVPN Root CA\" -out {p12_path} -passout pass:nexusvpn 2>/dev/null || openssl pkcs12 -export -inkey {user_key} -in {user_crt} -name \"{username}\" -certfile {CertManager.PKI_DIR}/ca.crt -caname \"NexusVPN Root CA\" -out {p12_path} -passout pass:nexusvpn"
+        # 2. 生成用户 Cert
+        pub_key_proc = subprocess.run(
+            ["ipsec", "pki", "--pub", "--in", user_key, "--type", "rsa"],
+            capture_output=True, check=True
+        )
+        with open(user_crt, "w") as f:
+            subprocess.run(
+                ["ipsec", "pki", "--issue", "--lifetime", "3650",
+                 "--cacert", ca_crt, "--cakey", ca_key,
+                 "--dn", f"CN={username}", f"--san={username}",
+                 "--flag", "clientAuth", "--outform", "pem"],
+                input=pub_key_proc.stdout, stdout=f, check=True
+            )
         
+        # 3. 导出 P12 (尝试 -legacy，失败则回退)
+        p12_password = CertManager.P12_PASSWORD
         try:
-            subprocess.check_call(cmd, shell=True)
+            subprocess.run(
+                ["openssl", "pkcs12", "-export", "-legacy",
+                 "-inkey", user_key, "-in", user_crt,
+                 "-name", username, "-certfile", ca_crt,
+                 "-caname", "NexusVPN Root CA",
+                 "-out", p12_path, "-passout", f"pass:{p12_password}"],
+                check=True, stderr=subprocess.DEVNULL
+            )
         except subprocess.CalledProcessError:
-            # 如果 -legacy 也不行，尝试指定具体算法 (兼容更老的 OpenSSL)
-            cmd_fallback = f"openssl pkcs12 -export -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 -inkey {user_key} -in {user_crt} -name \"{username}\" -certfile {CertManager.PKI_DIR}/ca.crt -out {p12_path} -passout pass:nexusvpn"
-            subprocess.check_call(cmd_fallback, shell=True)
+            # 回退到兼容模式
+            subprocess.run(
+                ["openssl", "pkcs12", "-export",
+                 "-keypbe", "PBE-SHA1-3DES", "-certpbe", "PBE-SHA1-3DES", "-macalg", "sha1",
+                 "-inkey", user_key, "-in", user_crt,
+                 "-name", username, "-certfile", ca_crt,
+                 "-out", p12_path, "-passout", f"pass:{p12_password}"],
+                check=True
+            )
 
         return p12_path
 
     @staticmethod
     def get_ca_content():
-        with open(f"{CertManager.PKI_DIR}/ca.crt", "rb") as f: return f.read()
+        with open(f"{CertManager.PKI_DIR}/ca.crt", "rb") as f:
+            return f.read()

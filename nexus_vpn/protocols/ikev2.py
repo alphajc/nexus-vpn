@@ -6,6 +6,7 @@ from nexus_vpn.utils.logger import log
 
 class IKEv2Manager:
     SECRETS_FILE = "/etc/ipsec.secrets"
+    IPSEC_CONF_FILE = "/etc/ipsec.conf"
 
     @staticmethod
     def init_pki(domain):
@@ -13,35 +14,90 @@ class IKEv2Manager:
 
     @staticmethod
     def generate_config(domain):
-        # 保持配置不变
-        pass 
+        domain = domain.split()[0].strip()
+        
+        config = f"""config setup
+    charondebug="ike 1, knl 1, cfg 0"
+    uniqueids=no
+
+conn %default
+    keyexchange=ikev2
+    ike=aes256gcm16-sha384-modp3072,aes256gcm16-sha384-modp4096,aes256-sha256-modp2048!
+    esp=aes256gcm16-sha384,aes256-sha256,aes256-sha1!
+    dpdaction=clear
+    dpddelay=300s
+
+conn IKEv2-Cert
+    left=%any
+    leftid=@{domain}
+    leftcert=server.crt
+    leftsendcert=always
+    leftsubnet=0.0.0.0/0,::/0
+    right=%any
+    rightid=%any
+    rightsourceip=10.10.10.0/24,fd00:10:10:10::/64
+    rightdns=8.8.8.8,1.1.1.1,2001:4860:4860::8888
+    auto=add
+
+conn IKEv2-EAP
+    left=%any
+    leftid=@{domain}
+    leftcert=server.crt
+    leftsendcert=always
+    leftauth=pubkey
+    right=%any
+    rightid=%any
+    rightauth=eap-mschapv2
+    rightsourceip=10.10.10.0/24,fd00:10:10:10::/64
+    rightdns=8.8.8.8,1.1.1.1,2001:4860:4860::8888
+    eap_identity=%identity
+    auto=add
+"""
+        with open(IKEv2Manager.IPSEC_CONF_FILE, "w") as f:
+            f.write(config)
+        
+        subprocess.run(["ipsec", "reload"])
+        log.success(f"IPsec 配置已生成: {IKEv2Manager.IPSEC_CONF_FILE}")
+
+    @staticmethod
+    def _remove_user_from_secrets(username):
+        """从 secrets 文件中移除指定用户的行"""
+        if not os.path.exists(IKEv2Manager.SECRETS_FILE):
+            return
+        with open(IKEv2Manager.SECRETS_FILE, "r") as f:
+            lines = f.readlines()
+        with open(IKEv2Manager.SECRETS_FILE, "w") as f:
+            for line in lines:
+                # 跳过匹配用户名的行
+                if line.startswith(f'{username} :') or line.startswith(f'"{username}" :'):
+                    continue
+                f.write(line)
 
     @staticmethod
     def add_eap_user(username, password):
-        if os.path.exists(IKEv2Manager.SECRETS_FILE):
-            subprocess.run(f"sed -i '/{username} /d' {IKEv2Manager.SECRETS_FILE}", shell=True)
-            subprocess.run(f"sed -i '/\"{username}\" /d' {IKEv2Manager.SECRETS_FILE}", shell=True)
+        IKEv2Manager._remove_user_from_secrets(username)
         
         with open(IKEv2Manager.SECRETS_FILE, "a") as f:
             f.write(f'{username} : EAP "{password}"\n')
-        subprocess.run("ipsec rereadsecrets", shell=True)
+        subprocess.run(["ipsec", "rereadsecrets"])
         log.success(f"EAP 用户 {username} 已激活。")
 
     @staticmethod
     def remove_eap_user(username):
-        if os.path.exists(IKEv2Manager.SECRETS_FILE):
-            subprocess.run(f"sed -i '/{username} /d' {IKEv2Manager.SECRETS_FILE}", shell=True)
-            subprocess.run("ipsec rereadsecrets", shell=True)
-            log.success(f"EAP 用户 {username} 已删除。")
+        IKEv2Manager._remove_user_from_secrets(username)
+        subprocess.run(["ipsec", "rereadsecrets"])
+        log.success(f"EAP 用户 {username} 已删除。")
 
     @staticmethod
     def create_mobileconfig(username, domain, p12_path):
         ca_content = CertManager.get_ca_content()
-        with open(p12_path, "rb") as f: p12_content = f.read()
+        with open(p12_path, "rb") as f:
+            p12_content = f.read()
         ca_b64 = base64.b64encode(ca_content).decode()
         p12_b64 = base64.b64encode(p12_content).decode()
         
         domain = domain.split()[0].strip()
+        p12_password = CertManager.P12_PASSWORD
 
         return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -73,7 +129,7 @@ class IKEv2Manager:
             <key>PayloadContent</key>
             <data>{p12_b64}</data>
             <key>Password</key>
-            <string>nexusvpn</string>
+            <string>{p12_password}</string>
         </dict>
         <dict>
             <key>PayloadIdentifier</key>
@@ -94,11 +150,8 @@ class IKEv2Manager:
                 <string>{domain}</string>
                 <key>RemoteIdentifier</key>
                 <string>{domain}</string>
-                
-                <!-- 核心修复: 强制指定 LocalIdentifier 为用户名 -->
                 <key>LocalIdentifier</key>
                 <string>{username}</string>
-                
                 <key>AuthenticationMethod</key>
                 <string>Certificate</string>
                 <key>PayloadCertificateUUID</key>

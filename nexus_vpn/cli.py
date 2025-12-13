@@ -1,6 +1,7 @@
 """命令行入口模块"""
 import click
 import os
+import re
 import sys
 import subprocess
 from rich.table import Table
@@ -13,6 +14,9 @@ from nexus_vpn.protocols.v2ray import V2RayManager
 
 console = Console()
 
+# 允许检查的服务名白名单
+ALLOWED_SERVICES = {"nexus-xray", "strongswan", "strongswan-starter", "ipsec"}
+
 
 def _check_root():
     """检查 root 权限"""
@@ -22,33 +26,47 @@ def _check_root():
 
 
 def check_service(name):
+    if name not in ALLOWED_SERVICES:
+        return "[red]invalid[/red]"
     try:
-        res = subprocess.run(f"systemctl is-active {name}", shell=True, capture_output=True, text=True)
+        res = subprocess.run(
+            ["systemctl", "is-active", name],
+            capture_output=True, text=True
+        )
         active = res.stdout.strip() if res.stdout else "unknown"
         color = "green" if active == "active" else "red"
         return f"[{color}]{active}[/{color}]"
-    except:
+    except subprocess.SubprocessError:
         return "[red]error[/red]"
 
 
 def check_port(port, proto="tcp"):
+    if not isinstance(port, int) or port < 1 or port > 65535:
+        return "[red]INVALID[/red]"
     flag = "-u" if "udp" in proto.lower() else "-t"
     try:
-        cmd = f"ss {flag}ln | grep ':{port} '"
-        if subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL).returncode == 0:
+        # 使用 ss 命令检查端口，不使用 shell
+        result = subprocess.run(
+            ["ss", flag + "ln"],
+            capture_output=True, text=True
+        )
+        if f":{port} " in result.stdout or f":{port}\t" in result.stdout:
             return "[green]OPEN[/green]"
-    except:
+    except subprocess.SubprocessError:
         pass
     return "[red]CLOSED[/red]"
 
 
 def check_bbr():
     try:
-        res = subprocess.run("sysctl -n net.ipv4.tcp_congestion_control", shell=True, capture_output=True, text=True)
+        res = subprocess.run(
+            ["sysctl", "-n", "net.ipv4.tcp_congestion_control"],
+            capture_output=True, text=True
+        )
         if "bbr" in res.stdout:
             return "[green]已开启 (BBR)[/green]"
         return f"[yellow]未开启 ({res.stdout.strip()})[/yellow]"
-    except:
+    except subprocess.SubprocessError:
         return "[red]Unknown[/red]"
 
 
@@ -131,11 +149,17 @@ def status():
     xray_port = f"TCP/443: {check_port(443, 'tcp')}"
     table.add_row("Xray (VLESS)", xray_status, xray_port)
 
-    ss_name = "strongswan-starter"
+    # 检测 strongswan 服务名
+    ss_name = "strongswan"
     try:
-        subprocess.check_call("systemctl list-unit-files | grep strongswan-starter", shell=True, stdout=subprocess.DEVNULL)
-    except:
-        ss_name = "strongswan"
+        result = subprocess.run(
+            ["systemctl", "list-unit-files", "--type=service"],
+            capture_output=True, text=True
+        )
+        if "strongswan-starter" in result.stdout:
+            ss_name = "strongswan-starter"
+    except subprocess.SubprocessError:
+        pass
 
     ike_status = check_service(ss_name)
     ike_ports = f"UDP/500:  {check_port(500, 'u')}\nUDP/4500: {check_port(4500, 'u')}"
@@ -144,7 +168,7 @@ def status():
     try:
         with open("/proc/sys/net/ipv4/ip_forward") as f:
             fw = "[green]Enabled[/green]" if f.read().strip() == "1" else "[red]Disabled[/red]"
-    except:
+    except OSError:
         fw = "[red]Unknown[/red]"
 
     table.add_row("Kernel", check_bbr(), f"IP Forward: {fw}")

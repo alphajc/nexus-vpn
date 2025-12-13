@@ -42,8 +42,9 @@ class V2RayManager:
         }
         
         os.makedirs(os.path.dirname(V2RayManager.CONFIG_PATH), exist_ok=True)
-        with open(V2RayManager.CONFIG_PATH, 'w') as f: json.dump(config, f, indent=4)
-        subprocess.run("systemctl restart nexus-xray", shell=True)
+        with open(V2RayManager.CONFIG_PATH, 'w') as f:
+            json.dump(config, f, indent=4)
+        subprocess.run(["systemctl", "restart", "nexus-xray"], check=True)
         return {"uuid": uid, "public_key": pub_key, "short_id": short_id, "sni": reality_dest.split(':')[0], "port": 443}
 
     @staticmethod
@@ -58,24 +59,32 @@ class V2RayManager:
             qr = qrcode.QRCode(border=1)
             qr.add_data(link)
             qr.print_ascii(invert=True)
-        except: pass
+        except Exception:
+            pass
 
     @staticmethod
     def add_user(username):
-        with open(V2RayManager.CONFIG_PATH, 'r') as f: cfg = json.load(f)
+        with open(V2RayManager.CONFIG_PATH, 'r') as f:
+            cfg = json.load(f)
         new_uid = str(uuid.uuid4())
-        cfg['inbounds'][0]['settings']['clients'].append({"id": new_uid, "flow": "xtls-rprx-vision", "email": username})
-        with open(V2RayManager.CONFIG_PATH, 'w') as f: json.dump(cfg, f, indent=4)
-        subprocess.run("systemctl restart nexus-xray", shell=True)
+        cfg['inbounds'][0]['settings']['clients'].append(
+            {"id": new_uid, "flow": "xtls-rprx-vision", "email": username}
+        )
+        with open(V2RayManager.CONFIG_PATH, 'w') as f:
+            json.dump(cfg, f, indent=4)
+        subprocess.run(["systemctl", "restart", "nexus-xray"], check=True)
         log.success(f"V2Ray 用户 {username} 已添加。")
 
     @staticmethod
     def remove_user(username):
-        with open(V2RayManager.CONFIG_PATH, 'r') as f: cfg = json.load(f)
+        with open(V2RayManager.CONFIG_PATH, 'r') as f:
+            cfg = json.load(f)
         clients = cfg['inbounds'][0]['settings']['clients']
         new_clients = [c for c in clients if c.get('email') != username]
-        if len(clients) == len(new_clients): return
+        if len(clients) == len(new_clients):
+            return
         cfg['inbounds'][0]['settings']['clients'] = new_clients
-        with open(V2RayManager.CONFIG_PATH, 'w') as f: json.dump(cfg, f, indent=4)
-        subprocess.run("systemctl restart nexus-xray", shell=True)
+        with open(V2RayManager.CONFIG_PATH, 'w') as f:
+            json.dump(cfg, f, indent=4)
+        subprocess.run(["systemctl", "restart", "nexus-xray"], check=True)
         log.success(f"V2Ray 用户 {username} 已删除。")

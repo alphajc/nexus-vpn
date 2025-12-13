@@ -2,7 +2,6 @@ import os
 import json
 import glob
 import click
-import subprocess
 from rich.table import Table
 from rich.console import Console
 from rich.panel import Panel
@@ -132,9 +131,14 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
         try:
             with open("/etc/ipsec.conf") as f:
                 m = re.search(r"leftid=@(.*)", f.read())
-                if m: return m.group(1).strip()
-        except: pass
+                if m:
+                    return m.group(1).strip()
+        except OSError:
+            pass
         # 尝试获取本机 IP 作为备选
         try:
-             return subprocess.check_output("curl -s ifconfig.me", shell=True).decode().strip()
-        except: return "your-server-ip"
+            import urllib.request
+            with urllib.request.urlopen("https://ifconfig.me", timeout=5) as resp:
+                return resp.read().decode().strip()
+        except Exception:
+            return "your-server-ip"
