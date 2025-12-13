@@ -56,8 +56,29 @@ conn IKEv2-EAP
 """
         sudo_write_file(IKEv2Manager.IPSEC_CONF_FILE, config)
         
+        # 初始化 ipsec.secrets，确保包含服务器私钥
+        IKEv2Manager._init_secrets()
+        
         sudo_run(["ipsec", "reload"])
         log.success(f"IPsec 配置已生成: {IKEv2Manager.IPSEC_CONF_FILE}")
+
+    @staticmethod
+    def _init_secrets():
+        """初始化 ipsec.secrets 文件，确保包含服务器私钥"""
+        try:
+            content = sudo_read_file(IKEv2Manager.SECRETS_FILE)
+        except Exception:
+            content = ""
+        
+        # 检查是否已包含 RSA 私钥配置
+        if ": RSA server.key" not in content and ": RSA /etc/ipsec.d/private/server.key" not in content:
+            # 在文件开头添加私钥配置
+            rsa_line = ": RSA server.key\n"
+            if content and not content.startswith("\n"):
+                rsa_line += "\n"
+            content = rsa_line + content
+            sudo_write_file(IKEv2Manager.SECRETS_FILE, content)
+            log.info("已添加服务器私钥到 ipsec.secrets")
 
     @staticmethod
     def _remove_user_from_secrets(username):

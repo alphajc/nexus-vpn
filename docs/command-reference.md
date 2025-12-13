@@ -58,16 +58,16 @@ nexus-vpn install --domain 203.0.113.10
 nexus-vpn install --domain vpn.example.com
 
 # 自定义 Reality 目标
-nexus-vpn install --domain 203.0.113.10 --reality-dest www.apple.com:443
+nexus-vpn install --domain 203.0.113.10 --reality-dest gateway.icloud.com:443
 
 # 多个 Reality 目标（增加伪装多样性）
 nexus-vpn install --domain 203.0.113.10 \
   --reality-dest www.microsoft.com:443 \
-  --reality-dest www.apple.com:443 \
-  --reality-dest www.google.com:443
+  --reality-dest gateway.icloud.com:443 \
+  --reality-dest dl.google.com:443
 
 # 修复/更新配置（重新运行 install，保留用户和证书）
-nexus-vpn install --domain vpn.example.com --reality-dest www.apple.com:443
+nexus-vpn install --domain vpn.example.com --reality-dest itunes.apple.com:443
 
 # 交互式安装（不提供 --domain 参数时会提示输入）
 nexus-vpn install

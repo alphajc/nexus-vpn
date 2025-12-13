@@ -9,7 +9,7 @@
 安装完成后，系统会输出 VLESS 连接 URL 和二维码：
 
 ```
-URL: vless://550e8400-e29b-41d4-a716-446655440000@203.0.113.10:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=xxxxx&sid=xxxx&type=tcp&flow=xtls-rprx-vision#NexusVPN
+URL: vless://550e8400-e29b-41d4-a716-446655440000@203.0.113.10:443?security=reality&sni=gateway.icloud.com&fp=chrome&pbk=xxxxx&sid=xxxx&type=tcp&flow=xtls-rprx-vision#NexusVPN
 ```
 
 ### iOS / macOS
@@ -51,7 +51,7 @@ URL: vless://550e8400-e29b-41d4-a716-446655440000@203.0.113.10:443?security=real
 | 流控 (Flow) | xtls-rprx-vision |
 | 传输协议 | tcp |
 | 安全类型 | reality |
-| SNI | www.microsoft.com |
+| SNI | gateway.icloud.com (或其他伪装域名) |
 | Fingerprint | chrome |
 | PublicKey | 安装时生成的公钥 |
 | ShortId | 安装时生成的短 ID |

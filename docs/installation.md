@@ -94,10 +94,34 @@ nexus-vpn install \
 
 ```bash
 nexus-vpn install --domain 203.0.113.10 \
-  --reality-dest www.microsoft.com:443 \
-  --reality-dest www.apple.com:443 \
-  --reality-dest www.google.com:443
+  --reality-dest gateway.icloud.com:443 \
+  --reality-dest dl.google.com:443 \
+  --reality-dest www.speedtest.net:443
 ```
+
+**推荐的伪装域名**：
+
+| 分类 | 域名 | 说明 |
+|------|------|------|
+| 🍎 Apple | `gateway.icloud.com` | iCloud 网关 |
+| | `itunes.apple.com` | iTunes 服务 |
+| | `swdist.apple.com` | 软件分发 |
+| | `swcdn.apple.com` | 软件 CDN |
+| | `updates.cdn-apple.com` | 更新 CDN |
+| | `osxapps.itunes.apple.com` | macOS 应用 |
+| | `aod.itunes.apple.com` | iTunes AOD |
+| 🦊 Mozilla | `download-installer.cdn.mozilla.net` | Firefox 下载 |
+| | `addons.mozilla.org` | 扩展商店 |
+| ☁️ AWS/Amazon | `s0.awsstatic.com` | AWS 静态资源 |
+| | `d1.awsstatic.com` | AWS CDN |
+| | `images-na.ssl-images-amazon.com` | Amazon 图片 |
+| | `m.media-amazon.com` | Amazon 媒体 |
+| | `player.live-video.net` | Twitch 播放器 |
+| 🟢 Google | `dl.google.com` | 下载服务 |
+| | `www.google-analytics.com` | 分析服务 |
+| 🔧 其它 | `www.microsoft.com` | 微软官网 |
+| | `www.speedtest.net` | 测速网站 |
+| | `www.speedtest.org` | 测速网站 |
 
 ### 部署过程
 
