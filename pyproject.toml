@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexus-vpn"
+version = "0.1.0"
+description = "一键部署 VLESS-Reality + IKEv2 VPN 的综合代理工具"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [
+    {name = "Jerry", email = "jerry@example.com"}
+]
+keywords = ["vpn", "proxy", "vless", "reality", "ikev2", "xray", "strongswan"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: Proxy Servers",
+    "Topic :: System :: Networking",
+]
+dependencies = [
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "qrcode>=7.4.0",
+    "jinja2>=3.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jerry/nexus-vpn"
+Repository = "https://github.com/jerry/nexus-vpn"
+Issues = "https://github.com/jerry/nexus-vpn/issues"
+
+[project.scripts]
+nexus-vpn = "nexus_vpn.cli:cli"
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "tests.*"]
