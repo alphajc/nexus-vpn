@@ -3,6 +3,7 @@ import base64
 import subprocess
 from nexus_vpn.core.cert_mgr import CertManager
 from nexus_vpn.utils.logger import log
+from nexus_vpn.utils.sudo import sudo_run, sudo_write_file, sudo_read_file
 
 class IKEv2Manager:
     SECRETS_FILE = "/etc/ipsec.secrets"
@@ -53,10 +54,9 @@ conn IKEv2-EAP
     eap_identity=%identity
     auto=add
 """
-        with open(IKEv2Manager.IPSEC_CONF_FILE, "w") as f:
-            f.write(config)
+        sudo_write_file(IKEv2Manager.IPSEC_CONF_FILE, config)
         
-        subprocess.run(["ipsec", "reload"])
+        sudo_run(["ipsec", "reload"])
         log.success(f"IPsec 配置已生成: {IKEv2Manager.IPSEC_CONF_FILE}")
 
     @staticmethod
@@ -64,28 +64,37 @@ conn IKEv2-EAP
         """从 secrets 文件中移除指定用户的行"""
         if not os.path.exists(IKEv2Manager.SECRETS_FILE):
             return
-        with open(IKEv2Manager.SECRETS_FILE, "r") as f:
-            lines = f.readlines()
-        with open(IKEv2Manager.SECRETS_FILE, "w") as f:
+        try:
+            content = sudo_read_file(IKEv2Manager.SECRETS_FILE)
+            lines = content.splitlines(keepends=True)
+            new_lines = []
             for line in lines:
                 # 跳过匹配用户名的行
                 if line.startswith(f'{username} :') or line.startswith(f'"{username}" :'):
                     continue
-                f.write(line)
+                new_lines.append(line)
+            sudo_write_file(IKEv2Manager.SECRETS_FILE, "".join(new_lines))
+        except Exception:
+            pass
 
     @staticmethod
     def add_eap_user(username, password):
         IKEv2Manager._remove_user_from_secrets(username)
         
-        with open(IKEv2Manager.SECRETS_FILE, "a") as f:
-            f.write(f'{username} : EAP "{password}"\n')
-        subprocess.run(["ipsec", "rereadsecrets"])
+        # 追加用户
+        try:
+            content = sudo_read_file(IKEv2Manager.SECRETS_FILE)
+        except Exception:
+            content = ""
+        content += f'{username} : EAP "{password}"\n'
+        sudo_write_file(IKEv2Manager.SECRETS_FILE, content)
+        sudo_run(["ipsec", "rereadsecrets"])
         log.success(f"EAP 用户 {username} 已激活。")
 
     @staticmethod
     def remove_eap_user(username):
         IKEv2Manager._remove_user_from_secrets(username)
-        subprocess.run(["ipsec", "rereadsecrets"])
+        sudo_run(["ipsec", "rereadsecrets"])
         log.success(f"EAP 用户 {username} 已删除。")
 
     @staticmethod

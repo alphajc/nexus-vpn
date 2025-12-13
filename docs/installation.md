@@ -13,7 +13,7 @@
 ### 软件依赖
 
 - **Python** 3.8 或更高版本
-- **root 权限**（安装和运行均需要）
+- **sudo 权限**（安装和运行时按需请求）
 
 ### 硬件要求
 
@@ -59,26 +59,27 @@ pip install -e .
 ### 基本部署
 
 ```bash
-sudo nexus-vpn install --domain <服务器IP或域名>
+nexus-vpn install --domain <服务器IP或域名>
 ```
 
 **示例**：
 
 ```bash
 # 使用 IP 地址
-sudo nexus-vpn install --domain 203.0.113.10
+nexus-vpn install --domain 203.0.113.10
 
 # 使用域名
-sudo nexus-vpn install --domain vpn.example.com
+nexus-vpn install --domain vpn.example.com
 ```
 
 ### 高级部署选项
 
 ```bash
-sudo nexus-vpn install \
+nexus-vpn install \
     --domain <服务器IP或域名> \
     --proto vless \
-    --reality-dest <目标网站>
+    --reality-dest <目标网站1> \
+    --reality-dest <目标网站2>
 ```
 
 **参数说明**：
@@ -87,7 +88,16 @@ sudo nexus-vpn install \
 |------|--------|------|
 | `--domain` | (必填) | 服务器公网 IP 或域名 |
 | `--proto` | `vless` | 协议类型（目前仅支持 vless） |
-| `--reality-dest` | `www.microsoft.com:443` | Reality 协议伪装的目标网站 |
+| `--reality-dest` | `www.microsoft.com:443` | Reality 协议伪装的目标网站（可多次指定） |
+
+**多目标示例**：
+
+```bash
+nexus-vpn install --domain 203.0.113.10 \
+  --reality-dest www.microsoft.com:443 \
+  --reality-dest www.apple.com:443 \
+  --reality-dest www.google.com:443
+```
 
 ### 部署过程
 
@@ -122,7 +132,7 @@ sudo nexus-vpn install \
 ### 检查服务状态
 
 ```bash
-sudo nexus-vpn status
+nexus-vpn status
 ```
 
 正常输出示例：
@@ -155,10 +165,23 @@ sudo ss -tlnp | grep 443
 sudo ss -ulnp | grep -E '500|4500'
 ```
 
+## 修复/更新配置
+
+如需更新配置（如更换 Reality 目标），只需重新运行 install 命令：
+
+```bash
+nexus-vpn install --domain vpn.example.com --reality-dest www.apple.com:443
+```
+
+此操作会：
+- 保留现有用户和密钥
+- 更新 Reality 目标配置
+- 重新生成 IKEv2 配置
+
 ## 卸载
 
 ```bash
-sudo nexus-vpn uninstall
+nexus-vpn uninstall
 ```
 
 卸载操作会：

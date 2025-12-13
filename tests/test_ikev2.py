@@ -69,16 +69,16 @@ class TestIKEv2Manager:
         assert "extra" not in content
     
     def test_generate_config_calls_ipsec_reload(self, mocker, temp_dir):
-        """测试 generate_config 调用 ipsec reload"""
+        """测试 generate_config 调用 sudo_run 执行 ipsec reload"""
         from nexus_vpn.protocols.ikev2 import IKEv2Manager
         
         conf_path = os.path.join(temp_dir, "ipsec.conf")
         mocker.patch.object(IKEv2Manager, 'IPSEC_CONF_FILE', conf_path)
-        mock_run = mocker.patch('subprocess.run')
+        mock_sudo_run = mocker.patch('nexus_vpn.protocols.ikev2.sudo_run')
         
         IKEv2Manager.generate_config("example.com")
         
-        mock_run.assert_called_with(["ipsec", "reload"])
+        mock_sudo_run.assert_called_with(["ipsec", "reload"])
     
     def test_remove_user_from_secrets_file_not_exists(self, mocker, temp_dir):
         """测试 _remove_user_from_secrets 当文件不存在时"""
@@ -144,7 +144,7 @@ normaluser : EAP "password"
         
         secrets_path = os.path.join(temp_dir, "ipsec.secrets")
         mocker.patch.object(IKEv2Manager, 'SECRETS_FILE', secrets_path)
-        mock_run = mocker.patch('subprocess.run')
+        mock_sudo_run = mocker.patch('nexus_vpn.protocols.ikev2.sudo_run')
         
         # 创建空 secrets 文件
         with open(secrets_path, 'w') as f:
@@ -156,7 +156,7 @@ normaluser : EAP "password"
             result = f.read()
         
         assert 'newuser : EAP "newpassword"' in result
-        mock_run.assert_called_with(["ipsec", "rereadsecrets"])
+        mock_sudo_run.assert_called_with(["ipsec", "rereadsecrets"])
     
     def test_add_eap_user_replaces_existing(self, mocker, temp_dir):
         """测试 add_eap_user 替换现有用户"""
@@ -164,7 +164,7 @@ normaluser : EAP "password"
         
         secrets_path = os.path.join(temp_dir, "ipsec.secrets")
         mocker.patch.object(IKEv2Manager, 'SECRETS_FILE', secrets_path)
-        mocker.patch('subprocess.run')
+        mocker.patch('nexus_vpn.protocols.ikev2.sudo_run')
         
         # 创建包含用户的 secrets 文件
         with open(secrets_path, 'w') as f:
@@ -184,7 +184,7 @@ normaluser : EAP "password"
         
         secrets_path = os.path.join(temp_dir, "ipsec.secrets")
         mocker.patch.object(IKEv2Manager, 'SECRETS_FILE', secrets_path)
-        mock_run = mocker.patch('subprocess.run')
+        mock_sudo_run = mocker.patch('nexus_vpn.protocols.ikev2.sudo_run')
         
         with open(secrets_path, 'w') as f:
             f.write(': RSA server.key\ndeleteuser : EAP "password"\n')
@@ -195,7 +195,7 @@ normaluser : EAP "password"
             result = f.read()
         
         assert "deleteuser" not in result
-        mock_run.assert_called_with(["ipsec", "rereadsecrets"])
+        mock_sudo_run.assert_called_with(["ipsec", "rereadsecrets"])
     
     def test_create_mobileconfig_structure(self, mocker, temp_dir):
         """测试 create_mobileconfig 生成正确的 XML 结构"""

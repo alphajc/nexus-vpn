@@ -10,10 +10,6 @@ from nexus_vpn.core.installer import Installer
 from nexus_vpn.core.user_mgr import UserManager
 from nexus_vpn.protocols.v2ray import V2RayManager
 
-if os.geteuid() != 0:
-    print("❌ 错误: 必须使用 root 权限运行 (sudo python3 main.py ...)")
-    sys.exit(1)
-
 console = Console()
 
 # 允许检查的服务名白名单
@@ -71,16 +67,16 @@ def cli():
 @cli.command()
 @click.option('--domain', prompt='请输入服务器域名/IP', help='服务器公网IP或域名')
 @click.option('--proto', default='vless', type=click.Choice(['vless']), help='协议类型')
-@click.option('--reality-dest', default='www.microsoft.com:443', help='Reality 偷取的目标网站')
-def install(domain, proto, reality_dest):
+@click.option('--reality-dest', 'reality_dests', multiple=True, default=['www.microsoft.com:443'], help='Reality 偷取的目标网站（可多次指定）')
+def install(domain, proto, reality_dests):
     """[部署] 执行全自动安装与初始化"""
     log.info(f"开始部署 Nexus-VPN | 目标: {domain}")
     SystemChecker.check_os()
-    installer = Installer(domain, proto, reality_dest)
+    installer = Installer(domain, proto, reality_dests)
     installer.run()
     
     if proto == 'vless':
-        info = V2RayManager.create_config(domain, reality_dest)
+        info = V2RayManager.create_config(domain, reality_dests)
         V2RayManager.print_connection_info(domain, info)
     
     # 强制刷新一次 IKEv2 配置
@@ -93,6 +89,25 @@ def uninstall():
     """[卸载] 停止服务并清理文件"""
     if click.confirm('⚠️  警告: 此操作将删除所有配置、证书和服务，确定吗?'):
         Installer.cleanup()
+
+
+@cli.group()
+def update():
+    """[更新] 更新组件版本"""
+    pass
+
+
+@update.command(name='xray')
+@click.option('--version', 'target_version', default=None, help='指定版本号（如 1.8.6），留空则获取最新版')
+def update_xray(target_version):
+    """更新 Xray Core 到指定版本"""
+    Installer.update_xray(target_version)
+
+
+@update.command(name='strongswan')
+def update_strongswan():
+    """更新 StrongSwan 到最新版本"""
+    Installer.update_strongswan()
 
 @cli.group()
 def user():

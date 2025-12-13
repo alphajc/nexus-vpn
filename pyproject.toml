@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus-vpn"
-version = "0.1.2"
+version = "0.1.3"
 description = "一键部署 VLESS-Reality + IKEv2 VPN 的综合代理工具"
 readme = "README.md"
 license = "MIT"

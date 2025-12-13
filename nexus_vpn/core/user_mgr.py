@@ -6,6 +6,7 @@ from rich.table import Table
 from rich.console import Console
 from rich.panel import Panel
 from nexus_vpn.utils.logger import log
+from nexus_vpn.utils.sudo import sudo_read_file, sudo_remove
 from nexus_vpn.protocols.v2ray import V2RayManager
 from nexus_vpn.protocols.ikev2 import IKEv2Manager
 from nexus_vpn.core.cert_mgr import CertManager
@@ -58,7 +59,8 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
         elif vpn_type == 'ikev2-cert':
             for ext in ['.crt', '.key', '.p12']:
                 f = f"{CertManager.PKI_DIR}/certs/{username}{ext}"
-                if os.path.exists(f): os.remove(f)
+                sudo_remove(f)
+            # 本地文件可以直接删除
             if os.path.exists(f"{username}.mobileconfig"): os.remove(f"{username}.mobileconfig")
             log.success(f"IKEv2 证书 {username} 已清理")
         elif vpn_type == 'ikev2-eap':
@@ -72,9 +74,9 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
         v_table.add_column("UUID", style="dim")
         try:
             if os.path.exists(V2RayManager.CONFIG_PATH):
-                with open(V2RayManager.CONFIG_PATH) as f:
-                    clients = json.load(f)['inbounds'][0]['settings']['clients']
-                    for c in clients: v_table.add_row(c.get('email', 'N/A'), c.get('id', 'N/A'))
+                content = sudo_read_file(V2RayManager.CONFIG_PATH)
+                clients = json.loads(content)['inbounds'][0]['settings']['clients']
+                for c in clients: v_table.add_row(c.get('email', 'N/A'), c.get('id', 'N/A'))
         except Exception as e:
             v_table.add_row("[red]Error[/red]", str(e))
         console.print(v_table); print("")
@@ -108,12 +110,12 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
         try:
             if os.path.exists(IKEv2Manager.SECRETS_FILE):
                 found_eap_users = False
-                with open(IKEv2Manager.SECRETS_FILE) as f:
-                    for l in f:
-                        if " : EAP " in l:
-                            user = l.split(":")[0].strip().replace('"','')
-                            eap_table.add_row(user, "MSCHAPv2")
-                            found_eap_users = True
+                content = sudo_read_file(IKEv2Manager.SECRETS_FILE)
+                for l in content.splitlines():
+                    if " : EAP " in l:
+                        user = l.split(":")[0].strip().replace('"','')
+                        eap_table.add_row(user, "MSCHAPv2")
+                        found_eap_users = True
                 if not found_eap_users:
                     eap_table.add_row("无账号密码用户", "[dim]N/A[/dim]")
             else:
@@ -129,11 +131,11 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
     def _get_domain():
         import re
         try:
-            with open("/etc/ipsec.conf") as f:
-                m = re.search(r"leftid=@(.*)", f.read())
-                if m:
-                    return m.group(1).strip()
-        except OSError:
+            content = sudo_read_file("/etc/ipsec.conf")
+            m = re.search(r"leftid=@(.*)", content)
+            if m:
+                return m.group(1).strip()
+        except Exception:
             pass
         # 尝试获取本机 IP 作为备选
         try:

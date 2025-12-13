@@ -156,30 +156,6 @@ class TestCheckFunctions:
         assert result == "[red]Unknown[/red]"
 
 
-class TestCheckRoot:
-    """测试 _check_root 函数"""
-    
-    def test_check_root_as_root(self, mocker):
-        """测试以 root 身份运行"""
-        from nexus_vpn.cli import _check_root
-        
-        mocker.patch('os.geteuid', return_value=0)
-        
-        # 不应该抛出异常
-        _check_root()
-    
-    def test_check_root_as_non_root(self, mocker):
-        """测试以非 root 身份运行"""
-        from nexus_vpn.cli import _check_root
-        
-        mocker.patch('os.geteuid', return_value=1000)
-        
-        with pytest.raises(SystemExit) as exc_info:
-            _check_root()
-        
-        assert exc_info.value.code == 1
-
-
 class TestCLICommands:
     """测试 CLI 命令"""
     
@@ -193,23 +169,10 @@ class TestCLICommands:
         assert result.exit_code == 0
         assert "nexus-vpn" in result.output
     
-    def test_cli_install_requires_root(self, mocker):
-        """测试 install 命令需要 root 权限"""
-        from nexus_vpn.cli import cli
-        
-        mocker.patch('os.geteuid', return_value=1000)
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, ['install', '--domain', 'example.com'])
-        
-        assert result.exit_code == 1
-    
     def test_cli_install_success(self, mocker):
         """测试 install 命令成功执行"""
         from nexus_vpn.cli import cli
         
-        # 必须 mock _check_root 函数本身
-        mocker.patch('nexus_vpn.cli._check_root')
         mocker.patch('nexus_vpn.cli.SystemChecker.check_os')
         # mock cli 模块中导入的 Installer
         mock_installer_class = mocker.patch('nexus_vpn.cli.Installer')
@@ -228,22 +191,10 @@ class TestCLICommands:
         mock_installer_class.assert_called_once()
         mock_installer_instance.run.assert_called_once()
     
-    def test_cli_uninstall_requires_root(self, mocker):
-        """测试 uninstall 命令需要 root 权限"""
-        from nexus_vpn.cli import cli
-        
-        mocker.patch('os.geteuid', return_value=1000)
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, ['uninstall'])
-        
-        assert result.exit_code == 1
-    
     def test_cli_uninstall_confirmed(self, mocker):
         """测试 uninstall 命令确认后执行"""
         from nexus_vpn.cli import cli
         
-        mocker.patch('nexus_vpn.cli._check_root')
         mock_cleanup = mocker.patch('nexus_vpn.core.installer.Installer.cleanup')
         
         runner = CliRunner()
@@ -256,7 +207,6 @@ class TestCLICommands:
         """测试 uninstall 命令取消"""
         from nexus_vpn.cli import cli
         
-        mocker.patch('nexus_vpn.cli._check_root')
         mock_cleanup = mocker.patch('nexus_vpn.core.installer.Installer.cleanup')
         
         runner = CliRunner()
@@ -277,22 +227,10 @@ class TestCLICommands:
         assert "del" in result.output
         assert "list" in result.output
     
-    def test_cli_user_add_requires_root(self, mocker):
-        """测试 user add 命令需要 root 权限"""
-        from nexus_vpn.cli import cli
-        
-        mocker.patch('os.geteuid', return_value=1000)
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, ['user', 'add', '--type', 'v2ray', '--username', 'test'])
-        
-        assert result.exit_code == 1
-    
     def test_cli_user_add_v2ray(self, mocker):
         """测试添加 V2Ray 用户"""
         from nexus_vpn.cli import cli
         
-        mocker.patch('nexus_vpn.cli._check_root')
         mock_add = mocker.patch('nexus_vpn.core.user_mgr.UserManager.add')
         
         runner = CliRunner()
@@ -305,7 +243,6 @@ class TestCLICommands:
         """测试删除用户"""
         from nexus_vpn.cli import cli
         
-        mocker.patch('nexus_vpn.cli._check_root')
         mock_remove = mocker.patch('nexus_vpn.core.user_mgr.UserManager.remove')
         
         runner = CliRunner()
@@ -318,7 +255,6 @@ class TestCLICommands:
         """测试列出用户"""
         from nexus_vpn.cli import cli
         
-        mocker.patch('nexus_vpn.cli._check_root')
         mock_list = mocker.patch('nexus_vpn.core.user_mgr.UserManager.list_users')
         
         runner = CliRunner()
@@ -327,21 +263,10 @@ class TestCLICommands:
         assert result.exit_code == 0
         mock_list.assert_called_once()
     
-    def test_cli_status_requires_root(self, mocker):
-        """测试 status 命令需要 root 权限"""
-        from nexus_vpn.cli import cli
-        
-        # 不 mock _check_root，让它正常检查
-        runner = CliRunner()
-        result = runner.invoke(cli, ['status'])
-        
-        assert result.exit_code == 1
-    
     def test_cli_status(self, mocker):
         """测试 status 命令"""
         from nexus_vpn.cli import cli
         
-        mocker.patch('nexus_vpn.cli._check_root')
         mocker.patch('subprocess.run', return_value=MagicMock(stdout="active\n"))
         mocker.patch('builtins.open', mocker.mock_open(read_data="1"))
         

@@ -107,3 +107,62 @@ def mock_subprocess_run(mocker):
 def mock_subprocess_check_output(mocker):
     """Mock subprocess.check_output"""
     return mocker.patch('subprocess.check_output')
+
+
+@pytest.fixture(autouse=True)
+def mock_sudo_helpers(mocker, temp_dir):
+    """自动 mock sudo helpers，使其直接操作本地文件（不执行系统命令）"""
+    from unittest.mock import MagicMock
+    
+    # Mock need_sudo 返回 False（不需要 sudo）
+    mocker.patch('nexus_vpn.utils.sudo.need_sudo', return_value=False)
+    
+    # 让 sudo_run 返回一个 mock 对象（不执行实际命令）
+    mock_run_result = MagicMock()
+    mock_run_result.returncode = 0
+    mock_run_result.stdout = ""
+    mock_run_result.stderr = ""
+    mocker.patch('nexus_vpn.utils.sudo.sudo_run', return_value=mock_run_result)
+    
+    # sudo_write_file 直接写入文件
+    def mock_sudo_write_file(path, content, mode='w'):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, mode) as f:
+            f.write(content)
+    
+    mocker.patch('nexus_vpn.utils.sudo.sudo_write_file', side_effect=mock_sudo_write_file)
+    
+    # sudo_read_file 直接读取文件
+    def mock_sudo_read_file(path):
+        with open(path, 'r') as f:
+            return f.read()
+    
+    mocker.patch('nexus_vpn.utils.sudo.sudo_read_file', side_effect=mock_sudo_read_file)
+    
+    # sudo_makedirs 直接创建目录
+    def mock_sudo_makedirs(path, mode=0o755):
+        os.makedirs(path, exist_ok=True)
+    
+    mocker.patch('nexus_vpn.utils.sudo.sudo_makedirs', side_effect=mock_sudo_makedirs)
+    
+    # sudo_chmod 直接修改权限
+    def mock_sudo_chmod(path, mode):
+        os.chmod(path, mode)
+    
+    mocker.patch('nexus_vpn.utils.sudo.sudo_chmod', side_effect=mock_sudo_chmod)
+    
+    # sudo_move 直接移动文件
+    import shutil
+    def mock_sudo_move(src, dst):
+        shutil.move(src, dst)
+    
+    mocker.patch('nexus_vpn.utils.sudo.sudo_move', side_effect=mock_sudo_move)
+    
+    # sudo_remove 直接删除
+    def mock_sudo_remove(path):
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        elif os.path.exists(path):
+            os.remove(path)
+    
+    mocker.patch('nexus_vpn.utils.sudo.sudo_remove', side_effect=mock_sudo_remove)

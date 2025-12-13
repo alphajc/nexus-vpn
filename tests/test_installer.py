@@ -17,27 +17,40 @@ class TestInstaller:
         from nexus_vpn.core.installer import Installer
         assert Installer.XRAY_VERSION == "1.8.4"
     
-    def test_xray_url_constant(self):
-        """测试 XRAY_URL 常量"""
+    def test_xray_url_method(self):
+        """测试 get_xray_download_url 方法"""
         from nexus_vpn.core.installer import Installer
-        assert "github.com" in Installer.XRAY_URL
-        assert "Xray-core" in Installer.XRAY_URL
-        assert Installer.XRAY_VERSION in Installer.XRAY_URL
+        url = Installer.get_xray_download_url(Installer.XRAY_VERSION)
+        assert "github.com" in url
+        assert "Xray-core" in url
+        assert Installer.XRAY_VERSION in url
     
-    def test_init(self):
-        """测试 Installer 初始化"""
+    def test_init_single_dest(self):
+        """测试 Installer 初始化（单个 reality_dest）"""
         from nexus_vpn.core.installer import Installer
         
         installer = Installer("example.com", "vless", "www.microsoft.com:443")
         
         assert installer.domain == "example.com"
         assert installer.proto == "vless"
-        assert installer.reality_dest == "www.microsoft.com:443"
+        assert installer.reality_dests == ["www.microsoft.com:443"]
+    
+    def test_init_multiple_dests(self):
+        """测试 Installer 初始化（多个 reality_dests）"""
+        from nexus_vpn.core.installer import Installer
+        
+        dests = ["www.microsoft.com:443", "www.apple.com:443"]
+        installer = Installer("example.com", "vless", dests)
+        
+        assert installer.domain == "example.com"
+        assert installer.proto == "vless"
+        assert installer.reality_dests == dests
     
     def test_run_calls_all_steps(self, mocker):
         """测试 run 方法调用所有安装步骤"""
         from nexus_vpn.core.installer import Installer
         
+        mocker.patch('os.path.exists', return_value=False)
         mock_deps = mocker.patch.object(Installer, 'install_dependencies')
         mock_xray = mocker.patch.object(Installer, 'install_xray')
         mock_network = mocker.patch.object(Installer, 'setup_network')
@@ -50,19 +63,46 @@ class TestInstaller:
         mock_xray.assert_called_once()
         mock_network.assert_called_once()
         mock_pki.assert_called_once_with("example.com")
+
+    def test_run_idempotent_detects_existing_install(self, mocker):
+        """测试 run 方法检测已安装状态（幂等性）"""
+        from nexus_vpn.core.installer import Installer
+        
+        # 模拟 Xray 和 PKI 都已存在
+        def mock_exists(path):
+            if path == "/usr/local/bin/xray":
+                return True
+            if path == "/etc/nexus-vpn/pki/ca.crt":
+                return True
+            return False
+        
+        mocker.patch('os.path.exists', side_effect=mock_exists)
+        mock_deps = mocker.patch.object(Installer, 'install_dependencies')
+        mock_xray = mocker.patch.object(Installer, 'install_xray')
+        mock_network = mocker.patch.object(Installer, 'setup_network')
+        mock_pki = mocker.patch('nexus_vpn.protocols.ikev2.IKEv2Manager.init_pki')
+        
+        installer = Installer("example.com", "vless", "www.microsoft.com:443")
+        installer.run()
+        
+        # 所有步骤仍应被调用（幂等执行）
+        mock_deps.assert_called_once()
+        mock_xray.assert_called_once()
+        mock_network.assert_called_once()
+        mock_pki.assert_called_once()
     
     def test_install_dependencies_apt(self, mocker):
         """测试使用 apt-get 安装依赖"""
         from nexus_vpn.core.installer import Installer
         
         mocker.patch('shutil.which', side_effect=lambda x: '/usr/bin/apt-get' if x == 'apt-get' else None)
-        mock_run = mocker.patch('subprocess.run')
+        mock_sudo_run = mocker.patch('nexus_vpn.core.installer.sudo_run')
         
         installer = Installer("example.com", "vless", "www.microsoft.com:443")
         installer.install_dependencies()
         
-        # 验证 apt-get update 和 install 被调用
-        calls = mock_run.call_args_list
+        # 验证 sudo_run 被调用
+        calls = [str(c) for c in mock_sudo_run.call_args_list]
         assert any('apt-get' in str(c) and 'update' in str(c) for c in calls)
         assert any('apt-get' in str(c) and 'install' in str(c) for c in calls)
     
@@ -78,12 +118,12 @@ class TestInstaller:
             return None
         
         mocker.patch('shutil.which', side_effect=which_side_effect)
-        mock_run = mocker.patch('subprocess.run')
+        mock_sudo_run = mocker.patch('nexus_vpn.core.installer.sudo_run')
         
         installer = Installer("example.com", "vless", "www.microsoft.com:443")
         installer.install_dependencies()
         
-        calls = mock_run.call_args_list
+        calls = [str(c) for c in mock_sudo_run.call_args_list]
         assert any('yum' in str(c) for c in calls)
     
     def test_install_dependencies_handles_error(self, mocker):
@@ -92,7 +132,7 @@ class TestInstaller:
         import subprocess
         
         mocker.patch('shutil.which', return_value='/usr/bin/apt-get')
-        mock_run = mocker.patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, 'apt-get'))
+        mocker.patch('nexus_vpn.core.installer.sudo_run', side_effect=subprocess.CalledProcessError(1, 'apt-get'))
         
         installer = Installer("example.com", "vless", "www.microsoft.com:443")
         
@@ -105,10 +145,8 @@ class TestInstaller:
         
         mocker.patch('os.path.exists', return_value=True)
         mock_urlretrieve = mocker.patch('urllib.request.urlretrieve')
-        mock_run = mocker.patch('subprocess.run')
-        
-        # Mock open for service file
-        mocker.patch('builtins.open', mocker.mock_open())
+        mock_sudo_run = mocker.patch('nexus_vpn.core.installer.sudo_run')
+        mock_sudo_write = mocker.patch('nexus_vpn.core.installer.sudo_write_file')
         
         installer = Installer("example.com", "vless", "www.microsoft.com:443")
         installer.install_xray()
@@ -117,7 +155,8 @@ class TestInstaller:
         mock_urlretrieve.assert_not_called()
         
         # 但应该创建 systemd service
-        mock_run.assert_called()
+        mock_sudo_write.assert_called()
+        mock_sudo_run.assert_called()
     
     def test_install_xray_downloads_and_extracts(self, mocker, temp_dir):
         """测试下载并解压 Xray"""
@@ -126,7 +165,6 @@ class TestInstaller:
         
         # 创建模拟的 zip 文件
         zip_path = os.path.join(temp_dir, "xray.zip")
-        xray_bin = os.path.join(temp_dir, "xray")
         
         with zipfile.ZipFile(zip_path, 'w') as z:
             z.writestr("xray", b"FAKE BINARY")
@@ -138,10 +176,10 @@ class TestInstaller:
         
         mocker.patch('os.path.exists', side_effect=mock_exists)
         mocker.patch('urllib.request.urlretrieve')
-        mocker.patch('shutil.move')
-        mocker.patch('os.chmod')
-        mock_run = mocker.patch('subprocess.run')
-        mocker.patch('builtins.open', mocker.mock_open())
+        mock_sudo_run = mocker.patch('nexus_vpn.core.installer.sudo_run')
+        mock_sudo_write = mocker.patch('nexus_vpn.core.installer.sudo_write_file')
+        mock_sudo_move = mocker.patch('nexus_vpn.core.installer.sudo_move')
+        mock_sudo_chmod = mocker.patch('nexus_vpn.core.installer.sudo_chmod')
         
         # Mock tempfile
         mock_temp = mocker.patch('tempfile.TemporaryDirectory')
@@ -157,7 +195,7 @@ class TestInstaller:
         installer.install_xray()
         
         # 验证 systemd 命令被调用
-        calls = [str(c) for c in mock_run.call_args_list]
+        calls = [str(c) for c in mock_sudo_run.call_args_list]
         assert any('daemon-reload' in c for c in calls)
         assert any('enable' in c for c in calls)
     
@@ -171,17 +209,15 @@ class TestInstaller:
         
         mocker.patch('os.path.exists', return_value=True)
         
-        # Mock file operations
-        original_open = open
-        def mock_open_func(path, *args, **kwargs):
-            if 'sysctl.conf' in str(path):
-                return original_open(sysctl_path, *args, **kwargs)
-            return MagicMock()
+        mock_sudo_run = mocker.patch('nexus_vpn.core.installer.sudo_run')
+        mock_sudo_run.return_value = MagicMock(stdout="default via 1.2.3.4 dev eth0", returncode=0)
         
-        mocker.patch('builtins.open', side_effect=mock_open_func)
-        
+        # Mock subprocess.run for ip route
         mock_run = mocker.patch('subprocess.run')
         mock_run.return_value = MagicMock(stdout="default via 1.2.3.4 dev eth0", returncode=0)
+        
+        mock_sudo_read = mocker.patch('nexus_vpn.core.installer.sudo_read_file', return_value="# Existing\n")
+        mock_sudo_write = mocker.patch('nexus_vpn.core.installer.sudo_write_file')
         
         mocker.patch('shutil.which', return_value=None)  # No netfilter-persistent
         
@@ -193,7 +229,7 @@ class TestInstaller:
             pass  # 可能因为 mock 不完整而失败
         
         # 验证 sysctl -p 被调用
-        calls = [str(c) for c in mock_run.call_args_list]
+        calls = [str(c) for c in mock_sudo_run.call_args_list]
         assert any('sysctl' in c for c in calls)
     
     def test_setup_network_configures_iptables(self, mocker):
@@ -201,10 +237,13 @@ class TestInstaller:
         from nexus_vpn.core.installer import Installer
         
         mocker.patch('os.path.exists', return_value=True)
-        mocker.patch('builtins.open', mocker.mock_open(read_data=""))
         
+        mock_sudo_run = mocker.patch('nexus_vpn.core.installer.sudo_run')
+        mock_sudo_read = mocker.patch('nexus_vpn.core.installer.sudo_read_file', return_value="")
+        mock_sudo_write = mocker.patch('nexus_vpn.core.installer.sudo_write_file')
+        
+        # Mock subprocess.run for ip route
         mock_run = mocker.patch('subprocess.run')
-        # Mock ip route show default
         mock_run.return_value = MagicMock(
             stdout="default via 1.2.3.4 dev eth0 proto static",
             returncode=0
@@ -216,32 +255,22 @@ class TestInstaller:
         installer.setup_network()
         
         # 验证 iptables 被调用
-        calls = [str(c) for c in mock_run.call_args_list]
+        calls = [str(c) for c in mock_sudo_run.call_args_list]
         assert any('iptables' in c for c in calls)
     
     def test_cleanup(self, mocker, temp_dir):
         """测试 cleanup 静态方法"""
         from nexus_vpn.core.installer import Installer
         
-        mock_run = mocker.patch('subprocess.run')
-        mock_rmtree = mocker.patch('shutil.rmtree')
-        mock_remove = mocker.patch('os.remove')
-        
-        def mock_exists(path):
-            return True
-        
-        def mock_isdir(path):
-            return path in ["/usr/local/etc/xray", "/etc/nexus-vpn"]
-        
-        mocker.patch('os.path.exists', side_effect=mock_exists)
-        mocker.patch('os.path.isdir', side_effect=mock_isdir)
+        mock_sudo_run = mocker.patch('nexus_vpn.core.installer.sudo_run')
+        mock_sudo_remove = mocker.patch('nexus_vpn.core.installer.sudo_remove')
         
         Installer.cleanup()
         
         # 验证服务停止
-        calls = [str(c) for c in mock_run.call_args_list]
+        calls = [str(c) for c in mock_sudo_run.call_args_list]
         assert any('stop' in c for c in calls)
         assert any('daemon-reload' in c for c in calls)
         
         # 验证文件删除
-        assert mock_rmtree.called or mock_remove.called
+        assert mock_sudo_remove.called

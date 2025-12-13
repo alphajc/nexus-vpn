@@ -6,9 +6,12 @@
 
 ```
 nexus-vpn
-├── install      # 部署 VPN 服务
+├── install      # 部署 VPN 服务（幂等，可重复执行）
 ├── uninstall    # 卸载 VPN 服务
 ├── status       # 查看服务状态
+├── update       # 更新组件
+│   ├── xray         # 更新 Xray Core
+│   └── strongswan   # 更新 StrongSwan
 └── user         # 用户管理
     ├── add      # 添加用户
     ├── del      # 删除用户
@@ -17,14 +20,19 @@ nexus-vpn
 
 ## 全局说明
 
-- 所有命令都需要 **root 权限**运行
-- 使用 `sudo nexus-vpn <命令>` 或以 root 用户运行
+- 命令本身**不需要 sudo 执行**，需要特权操作时会自动请求 sudo
+- 也可使用 `sudo nexus-vpn <命令>` 或以 root 用户运行
 
 ---
 
 ## nexus-vpn install
 
 部署 VPN 服务，包括 VLESS-Reality 和 IKEv2。
+
+**幂等性**：此命令可重复执行。重新运行时会：
+- 保留现有用户和密钥
+- 更新配置文件（如 Reality 目标）
+- 跳过已安装的组件
 
 ### 语法
 
@@ -38,32 +46,41 @@ nexus-vpn install [OPTIONS]
 |------|------|------|--------|------|
 | `--domain` | TEXT | 是 | - | 服务器公网 IP 或域名 |
 | `--proto` | CHOICE | 否 | `vless` | 协议类型，目前仅支持 `vless` |
-| `--reality-dest` | TEXT | 否 | `www.microsoft.com:443` | Reality 协议伪装的目标网站 |
+| `--reality-dest` | TEXT | 否 | `www.microsoft.com:443` | Reality 协议伪装的目标网站（可多次指定） |
 
 ### 示例
 
 ```bash
 # 基本安装
-sudo nexus-vpn install --domain 203.0.113.10
+nexus-vpn install --domain 203.0.113.10
 
 # 使用域名
-sudo nexus-vpn install --domain vpn.example.com
+nexus-vpn install --domain vpn.example.com
 
 # 自定义 Reality 目标
-sudo nexus-vpn install --domain 203.0.113.10 --reality-dest www.apple.com:443
+nexus-vpn install --domain 203.0.113.10 --reality-dest www.apple.com:443
+
+# 多个 Reality 目标（增加伪装多样性）
+nexus-vpn install --domain 203.0.113.10 \
+  --reality-dest www.microsoft.com:443 \
+  --reality-dest www.apple.com:443 \
+  --reality-dest www.google.com:443
+
+# 修复/更新配置（重新运行 install，保留用户和证书）
+nexus-vpn install --domain vpn.example.com --reality-dest www.apple.com:443
 
 # 交互式安装（不提供 --domain 参数时会提示输入）
-sudo nexus-vpn install
+nexus-vpn install
 ```
 
 ### 执行流程
 
 1. 检查操作系统兼容性
 2. 安装系统依赖包
-3. 下载并部署 Xray Core
+3. 下载并部署 Xray Core（已存在则跳过）
 4. 配置网络（IP 转发、BBR、NAT）
-5. 初始化 PKI 环境（生成 CA 和服务器证书）
-6. 生成 VLESS 配置并启动服务
+5. 初始化 PKI 环境（已存在则跳过）
+6. 生成 VLESS 配置并启动服务（保留现有用户）
 7. 初始化 IKEv2 VPN
 8. 输出连接信息和二维码
 
@@ -86,7 +103,7 @@ nexus-vpn uninstall
 ### 示例
 
 ```bash
-sudo nexus-vpn uninstall
+nexus-vpn uninstall
 ```
 
 ### 执行流程
@@ -110,6 +127,65 @@ sudo nexus-vpn uninstall
 
 ---
 
+## nexus-vpn update
+
+更新组件版本命令组。
+
+### 子命令
+
+| 命令 | 说明 |
+|------|------|
+| `xray` | 更新 Xray Core |
+| `strongswan` | 更新 StrongSwan |
+
+---
+
+## nexus-vpn update xray
+
+更新 Xray Core 到指定版本或最新版本。
+
+### 语法
+
+```bash
+nexus-vpn update xray [OPTIONS]
+```
+
+### 选项
+
+| 选项 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `--version` | TEXT | 否 | (最新版) | 指定版本号（如 1.8.6） |
+
+### 示例
+
+```bash
+# 更新到最新版
+nexus-vpn update xray
+
+# 更新到指定版本
+nexus-vpn update xray --version 1.8.6
+```
+
+---
+
+## nexus-vpn update strongswan
+
+更新 StrongSwan 到最新版本。
+
+### 语法
+
+```bash
+nexus-vpn update strongswan
+```
+
+### 示例
+
+```bash
+nexus-vpn update strongswan
+```
+
+---
+
 ## nexus-vpn status
 
 检查 VPN 服务的运行状态。
@@ -127,7 +203,7 @@ nexus-vpn status
 ### 示例
 
 ```bash
-sudo nexus-vpn status
+nexus-vpn status
 ```
 
 ### 输出说明
@@ -199,14 +275,7 @@ nexus-vpn user add --type <TYPE> --username <USERNAME>
 ### 示例
 
 ```bash
-# 添加 V2Ray 用户
-sudo nexus-vpn user add --type v2ray --username alice
-
-# 添加 IKEv2 证书用户
-sudo nexus-vpn user add --type ikev2-cert --username bob
-
-# 添加 IKEv2 EAP 用户（会提示输入密码）
-sudo nexus-vpn user add --type ikev2-eap --username charlie
+nexus-vpn user add --type v2ray --username alice
 ```
 
 ---
@@ -232,13 +301,13 @@ nexus-vpn user del --type <TYPE> --username <USERNAME>
 
 ```bash
 # 删除 V2Ray 用户
-sudo nexus-vpn user del --type v2ray --username alice
+nexus-vpn user del --type v2ray --username alice
 
 # 删除 IKEv2 证书用户
-sudo nexus-vpn user del --type ikev2-cert --username bob
+nexus-vpn user del --type ikev2-cert --username bob
 
 # 删除 IKEv2 EAP 用户
-sudo nexus-vpn user del --type ikev2-eap --username charlie
+nexus-vpn user del --type ikev2-eap --username charlie
 ```
 
 ### 删除内容
@@ -276,7 +345,7 @@ nexus-vpn user list
 ### 示例
 
 ```bash
-sudo nexus-vpn user list
+nexus-vpn user list
 ```
 
 ### 输出

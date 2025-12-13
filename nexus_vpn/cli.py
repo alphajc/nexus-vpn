@@ -1,8 +1,5 @@
 """命令行入口模块"""
 import click
-import os
-import re
-import sys
 import subprocess
 from rich.table import Table
 from rich.console import Console
@@ -16,13 +13,6 @@ console = Console()
 
 # 允许检查的服务名白名单
 ALLOWED_SERVICES = {"nexus-xray", "strongswan", "strongswan-starter", "ipsec"}
-
-
-def _check_root():
-    """检查 root 权限"""
-    if os.geteuid() != 0:
-        print("❌ 错误: 必须使用 root 权限运行 (sudo nexus-vpn ...)")
-        sys.exit(1)
 
 
 def check_service(name):
@@ -79,17 +69,16 @@ def cli():
 @cli.command()
 @click.option('--domain', prompt='请输入服务器域名/IP', help='服务器公网IP或域名')
 @click.option('--proto', default='vless', type=click.Choice(['vless']), help='协议类型')
-@click.option('--reality-dest', default='www.microsoft.com:443', help='Reality 偷取的目标网站')
-def install(domain, proto, reality_dest):
+@click.option('--reality-dest', 'reality_dests', multiple=True, default=['www.microsoft.com:443'], help='Reality 偷取的目标网站（可多次指定）')
+def install(domain, proto, reality_dests):
     """[部署] 执行全自动安装与初始化"""
-    _check_root()
     log.info(f"开始部署 Nexus-VPN | 目标: {domain}")
     SystemChecker.check_os()
-    installer = Installer(domain, proto, reality_dest)
+    installer = Installer(domain, proto, reality_dests)
     installer.run()
 
     if proto == 'vless':
-        info = V2RayManager.create_config(domain, reality_dest)
+        info = V2RayManager.create_config(domain, reality_dests)
         V2RayManager.print_connection_info(domain, info)
 
     from nexus_vpn.protocols.ikev2 import IKEv2Manager
@@ -100,9 +89,27 @@ def install(domain, proto, reality_dest):
 @cli.command()
 def uninstall():
     """[卸载] 停止服务并清理文件"""
-    _check_root()
     if click.confirm('⚠️  警告: 此操作将删除所有配置、证书和服务，确定吗?'):
         Installer.cleanup()
+
+
+@cli.group()
+def update():
+    """[更新] 更新组件版本"""
+    pass
+
+
+@update.command(name='xray')
+@click.option('--version', 'target_version', default=None, help='指定版本号（如 1.8.6），留空则获取最新版')
+def update_xray(target_version):
+    """更新 Xray Core 到指定版本"""
+    Installer.update_xray(target_version)
+
+
+@update.command(name='strongswan')
+def update_strongswan():
+    """更新 StrongSwan 到最新版本"""
+    Installer.update_strongswan()
 
 
 @cli.group()
@@ -116,7 +123,6 @@ def user():
 @click.option('--username', prompt='请输入用户名')
 def user_add(vpn_type, username):
     """添加用户"""
-    _check_root()
     UserManager.add(vpn_type, username)
 
 
@@ -125,21 +131,18 @@ def user_add(vpn_type, username):
 @click.option('--username', prompt='请输入用户名')
 def user_del(vpn_type, username):
     """删除用户"""
-    _check_root()
     UserManager.remove(vpn_type, username)
 
 
 @user.command(name='list')
 def user_list():
     """列出所有用户"""
-    _check_root()
     UserManager.list_users()
 
 
 @cli.command()
 def status():
     """[状态] 检查服务运行状态"""
-    _check_root()
     table = Table(title="🛡️ Nexus-VPN 系统状态", show_header=True, header_style="bold blue")
     table.add_column("组件", style="cyan")
     table.add_column("状态信息", style="bold")
