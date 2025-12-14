@@ -30,38 +30,38 @@ pip install nexus-vpn
 ### 部署服务
 
 ```bash
-sudo nexus-vpn install --domain your-server-ip
+nexus-vpn install --domain your-server-ip
 ```
 
 ### 查看状态
 
 ```bash
-sudo nexus-vpn status
+nexus-vpn status
 ```
 
 ### 用户管理
 
 ```bash
 # 添加 V2Ray 用户
-sudo nexus-vpn user add --type v2ray --username alice
+nexus-vpn user add --type v2ray --username alice
 
 # 添加 IKEv2 证书用户
-sudo nexus-vpn user add --type ikev2-cert --username bob
+nexus-vpn user add --type ikev2-cert --username bob
 
 # 添加 IKEv2 EAP 用户
-sudo nexus-vpn user add --type ikev2-eap --username charlie
+nexus-vpn user add --type ikev2-eap --username charlie
 
 # 列出所有用户
-sudo nexus-vpn user list
+nexus-vpn user list
 
 # 删除用户
-sudo nexus-vpn user del --type v2ray --username alice
+nexus-vpn user del --type v2ray --username alice
 ```
 
 ### 卸载
 
 ```bash
-sudo nexus-vpn uninstall
+nexus-vpn uninstall
 ```
 
 ## 命令参考

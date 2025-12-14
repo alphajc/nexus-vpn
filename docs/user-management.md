@@ -17,13 +17,13 @@ Nexus-VPN 支持三种类型的用户：
 ### 添加 V2Ray 用户
 
 ```bash
-sudo nexus-vpn user add --type v2ray --username <用户名>
+nexus-vpn user add --type v2ray --username <用户名>
 ```
 
 **示例**：
 
 ```bash
-sudo nexus-vpn user add --type v2ray --username alice
+nexus-vpn user add --type v2ray --username alice
 ```
 
 添加成功后，用户会被分配一个唯一的 UUID，可通过 `user list` 命令查看。
@@ -31,13 +31,13 @@ sudo nexus-vpn user add --type v2ray --username alice
 ### 添加 IKEv2 证书用户
 
 ```bash
-sudo nexus-vpn user add --type ikev2-cert --username <用户名>
+nexus-vpn user add --type ikev2-cert --username <用户名>
 ```
 
 **示例**：
 
 ```bash
-sudo nexus-vpn user add --type ikev2-cert --username bob
+nexus-vpn user add --type ikev2-cert --username bob
 ```
 
 执行后会在当前目录生成 `<用户名>.mobileconfig` 文件，可直接导入 iOS/macOS 设备。
@@ -53,13 +53,13 @@ sudo nexus-vpn user add --type ikev2-cert --username bob
 ### 添加 IKEv2 EAP 用户
 
 ```bash
-sudo nexus-vpn user add --type ikev2-eap --username <用户名>
+nexus-vpn user add --type ikev2-eap --username <用户名>
 ```
 
 **示例**：
 
 ```bash
-sudo nexus-vpn user add --type ikev2-eap --username charlie
+nexus-vpn user add --type ikev2-eap --username charlie
 ```
 
 系统会提示输入密码，创建成功后会显示详细的连接信息：
@@ -92,13 +92,13 @@ sudo nexus-vpn user add --type ikev2-eap --username charlie
 ### 删除 V2Ray 用户
 
 ```bash
-sudo nexus-vpn user del --type v2ray --username <用户名>
+nexus-vpn user del --type v2ray --username <用户名>
 ```
 
 ### 删除 IKEv2 证书用户
 
 ```bash
-sudo nexus-vpn user del --type ikev2-cert --username <用户名>
+nexus-vpn user del --type ikev2-cert --username <用户名>
 ```
 
 此操作会删除：
@@ -110,13 +110,13 @@ sudo nexus-vpn user del --type ikev2-cert --username <用户名>
 ### 删除 IKEv2 EAP 用户
 
 ```bash
-sudo nexus-vpn user del --type ikev2-eap --username <用户名>
+nexus-vpn user del --type ikev2-eap --username <用户名>
 ```
 
 ## 列出用户
 
 ```bash
-sudo nexus-vpn user list
+nexus-vpn user list
 ```
 
 输出示例：
@@ -163,14 +163,14 @@ EAP_USERS=("eap1:password1" "eap2:password2")
 
 # 添加 V2Ray 用户
 for user in "${V2RAY_USERS[@]}"; do
-    sudo nexus-vpn user add --type v2ray --username "$user"
+    nexus-vpn user add --type v2ray --username "$user"
 done
 
 # 添加 EAP 用户
 for entry in "${EAP_USERS[@]}"; do
     user="${entry%%:*}"
     pass="${entry##*:}"
-    echo "$pass" | sudo nexus-vpn user add --type ikev2-eap --username "$user"
+    echo "$pass" | nexus-vpn user add --type ikev2-eap --username "$user"
 done
 ```
 

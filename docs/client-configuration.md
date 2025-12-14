@@ -277,7 +277,7 @@ URL: vless://550e8400-e29b-41d4-a716-446655440000@203.0.113.10:443?security=real
 
 **Q: 连接超时**
 - 检查服务器 443 端口是否开放
-- 检查 Xray 服务是否运行：`sudo systemctl status nexus-xray`
+- 检查 Xray 服务是否运行：`systemctl status nexus-xray`
 
 **Q: TLS 握手失败**
 - 确认 Reality 配置的目标网站可访问
@@ -291,7 +291,7 @@ URL: vless://550e8400-e29b-41d4-a716-446655440000@203.0.113.10:443?security=real
 
 **Q: 连接被拒绝**
 - 检查远程 ID 是否正确填写（必须与服务器 IP/域名一致）
-- 检查 StrongSwan 服务状态：`sudo systemctl status strongswan-starter`
+- 检查 StrongSwan 服务状态：`systemctl status strongswan-starter`
 
 **Q: 认证失败 (EAP)**
 - 确认用户名和密码正确

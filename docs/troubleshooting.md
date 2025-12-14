@@ -8,7 +8,7 @@
 
 ```bash
 # 综合状态检查
-sudo nexus-vpn status
+nexus-vpn status
 
 # Xray 服务状态
 sudo systemctl status nexus-xray
@@ -102,7 +102,7 @@ sudo mv xray /usr/local/bin/
 sudo chmod +x /usr/local/bin/xray
 
 # 重新运行安装
-sudo nexus-vpn install --domain <your-domain>
+nexus-vpn install --domain <your-domain>
 ```
 
 ### 权限不足
@@ -112,8 +112,8 @@ sudo nexus-vpn install --domain <your-domain>
 **解决方案**：
 
 ```bash
-# 使用 sudo
-sudo nexus-vpn install --domain <your-domain>
+# 直接运行（会自动请求 sudo）
+nexus-vpn install --domain <your-domain>
 
 # 或切换到 root 用户
 sudo -i
@@ -154,7 +154,7 @@ sudo journalctl -u nexus-xray -n 50
    ```bash
    # 重新下载
    sudo rm /usr/local/bin/xray
-   sudo nexus-vpn install --domain <your-domain>
+   nexus-vpn install --domain <your-domain>
    ```
 
 ### 客户端连接超时
@@ -199,8 +199,8 @@ nc -zv <server-ip> 443
 
 1. **更换 Reality 目标网站**
    ```bash
-   sudo nexus-vpn uninstall
-   sudo nexus-vpn install --domain <your-domain> --reality-dest www.apple.com:443
+   nexus-vpn uninstall
+   nexus-vpn install --domain <your-domain> --reality-dest www.apple.com:443
    ```
 
 2. **检查目标网站可访问性**
@@ -266,14 +266,14 @@ sudo journalctl -u strongswan-starter -f
    sudo cat /etc/ipsec.secrets | grep EAP
    
    # 重新添加用户
-   sudo nexus-vpn user del --type ikev2-eap --username <user>
-   sudo nexus-vpn user add --type ikev2-eap --username <user>
+   nexus-vpn user del --type ikev2-eap --username <user>
+   nexus-vpn user add --type ikev2-eap --username <user>
    ```
 
 2. **证书用户 - 重新生成证书**
    ```bash
-   sudo nexus-vpn user del --type ikev2-cert --username <user>
-   sudo nexus-vpn user add --type ikev2-cert --username <user>
+   nexus-vpn user del --type ikev2-cert --username <user>
+   nexus-vpn user add --type ikev2-cert --username <user>
    ```
 
 ### 远程 ID 不匹配
@@ -411,7 +411,7 @@ htop
 
 ```bash
 # 卸载
-sudo nexus-vpn uninstall
+nexus-vpn uninstall
 
 # 清理残留文件
 sudo rm -rf /etc/nexus-vpn
@@ -419,7 +419,7 @@ sudo rm -rf /usr/local/etc/xray
 sudo rm -f /etc/ipsec.conf /etc/ipsec.secrets
 
 # 重新安装
-sudo nexus-vpn install --domain <your-domain>
+nexus-vpn install --domain <your-domain>
 ```
 
 ### 仅重置 PKI
@@ -429,7 +429,7 @@ sudo nexus-vpn install --domain <your-domain>
 sudo rm -rf /etc/nexus-vpn/pki
 
 # 重新运行安装以重新生成证书
-sudo nexus-vpn install --domain <your-domain>
+nexus-vpn install --domain <your-domain>
 ```
 
 ### 仅重置 Xray 配置
@@ -439,7 +439,7 @@ sudo nexus-vpn install --domain <your-domain>
 sudo rm -rf /usr/local/etc/xray
 
 # 重新运行安装
-sudo nexus-vpn install --domain <your-domain>
+nexus-vpn install --domain <your-domain>
 ```
 
 ---
@@ -450,7 +450,7 @@ sudo nexus-vpn install --domain <your-domain>
 
 1. **收集诊断信息**
    ```bash
-   sudo nexus-vpn status
+   nexus-vpn status
    sudo journalctl -u nexus-xray -n 100 > xray.log
    sudo journalctl -u strongswan-starter -n 100 > strongswan.log
    ```
