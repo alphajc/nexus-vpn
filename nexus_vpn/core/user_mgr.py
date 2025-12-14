@@ -17,7 +17,9 @@ class UserManager:
     @staticmethod
     def add(vpn_type, username):
         if vpn_type == 'v2ray':
-            V2RayManager.add_user(username)
+            info = V2RayManager.add_user(username)
+            domain = UserManager._get_v2ray_domain()
+            V2RayManager.print_connection_info(domain, info)
         
         elif vpn_type == 'ikev2-cert':
             p12 = CertManager.issue_user_cert(username)
@@ -144,3 +146,26 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
                 return resp.read().decode().strip()
         except Exception:
             return "your-server-ip"
+
+    @staticmethod
+    def _get_v2ray_domain():
+        """从 V2Ray 配置或公网 IP 获取域名"""
+        try:
+            import urllib.request
+            with urllib.request.urlopen("https://ifconfig.me", timeout=5) as resp:
+                return resp.read().decode().strip()
+        except Exception:
+            return "your-server-ip"
+
+    @staticmethod
+    def info(vpn_type, username):
+        """显示用户的连接信息"""
+        if vpn_type == 'v2ray':
+            user_info = V2RayManager.get_user_info(username)
+            if not user_info:
+                log.error(f"用户 {username} 不存在")
+                return
+            domain = UserManager._get_v2ray_domain()
+            V2RayManager.print_connection_info(domain, user_info)
+        else:
+            log.error(f"暂不支持 {vpn_type} 类型的用户信息查询")

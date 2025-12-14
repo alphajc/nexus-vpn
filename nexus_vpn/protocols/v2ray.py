@@ -123,6 +123,52 @@ class V2RayManager:
         sudo_write_file(V2RayManager.CONFIG_PATH, json.dumps(cfg, indent=4))
         sudo_run(["systemctl", "restart", "nexus-xray"], check=True)
         log.success(f"V2Ray 用户 {username} 已添加。")
+        
+        # 返回用户信息用于显示二维码
+        reality_settings = cfg['inbounds'][0]['streamSettings']['realitySettings']
+        # 从私钥推导公钥
+        priv_key = reality_settings['privateKey']
+        out = subprocess.check_output(["/usr/local/bin/xray", "x25519", "-i", priv_key]).decode()
+        pub_key = out.split('Public key:')[1].split('\n')[0].strip()
+        
+        return {
+            "uuid": new_uid,
+            "public_key": pub_key,
+            "short_id": reality_settings['shortIds'][0],
+            "sni": reality_settings['serverNames'][0],
+            "port": cfg['inbounds'][0]['port']
+        }
+
+    @staticmethod
+    def get_user_info(username):
+        """获取指定用户的连接信息"""
+        cfg_content = sudo_read_file(V2RayManager.CONFIG_PATH)
+        cfg = json.loads(cfg_content)
+        clients = cfg['inbounds'][0]['settings']['clients']
+        
+        # 查找用户
+        user_uuid = None
+        for c in clients:
+            if c.get('email') == username:
+                user_uuid = c.get('id')
+                break
+        
+        if not user_uuid:
+            return None
+        
+        # 获取连接参数
+        reality_settings = cfg['inbounds'][0]['streamSettings']['realitySettings']
+        priv_key = reality_settings['privateKey']
+        out = subprocess.check_output(["/usr/local/bin/xray", "x25519", "-i", priv_key]).decode()
+        pub_key = out.split('Public key:')[1].split('\n')[0].strip()
+        
+        return {
+            "uuid": user_uuid,
+            "public_key": pub_key,
+            "short_id": reality_settings['shortIds'][0],
+            "sni": reality_settings['serverNames'][0],
+            "port": cfg['inbounds'][0]['port']
+        }
 
     @staticmethod
     def remove_user(username):

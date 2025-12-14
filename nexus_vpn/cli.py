@@ -140,6 +140,14 @@ def user_list():
     UserManager.list_users()
 
 
+@user.command(name='info')
+@click.option('--type', 'vpn_type', type=click.Choice(['v2ray']), required=True)
+@click.option('--username', prompt='请输入用户名')
+def user_info(vpn_type, username):
+    """显示用户连接信息（URL + 二维码）"""
+    UserManager.info(vpn_type, username)
+
+
 @cli.command()
 def status():
     """[状态] 检查服务运行状态"""
