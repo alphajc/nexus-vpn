@@ -149,7 +149,17 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
 
     @staticmethod
     def _get_v2ray_domain():
-        """从 V2Ray 配置或公网 IP 获取域名"""
+        """从 V2Ray 配置获取域名"""
+        try:
+            if os.path.exists(V2RayManager.CONFIG_PATH):
+                content = sudo_read_file(V2RayManager.CONFIG_PATH)
+                cfg = json.loads(content)
+                domain = cfg.get('nexus', {}).get('domain')
+                if domain:
+                    return domain
+        except Exception:
+            pass
+        # 回退到公网 IP
         try:
             import urllib.request
             with urllib.request.urlopen("https://ifconfig.me", timeout=5) as resp:
@@ -166,6 +176,6 @@ scp root@{dom}:{CertManager.PKI_DIR}/ca.crt ./nexus-ca.crt
                 log.error(f"用户 {username} 不存在")
                 return
             domain = UserManager._get_v2ray_domain()
-            V2RayManager.print_connection_info(domain, user_info)
+            V2RayManager.print_connection_info(domain, user_info, f"用户 {username} 连接信息:")
         else:
             log.error(f"暂不支持 {vpn_type} 类型的用户信息查询")

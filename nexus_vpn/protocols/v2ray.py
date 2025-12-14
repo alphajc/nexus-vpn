@@ -70,6 +70,7 @@ class V2RayManager:
         
         config = {
             "log": {"loglevel": "warning"},
+            "nexus": {"domain": domain},  # 保存域名供后续使用
             "inbounds": [{
                 "port": 443,
                 "protocol": "vless",
@@ -98,12 +99,17 @@ class V2RayManager:
         return {"uuid": uid, "public_key": pub_key, "short_id": short_id, "sni": server_names[0], "port": 443}
 
     @staticmethod
-    def print_connection_info(domain, info):
-        link = (f"vless://{info['uuid']}@{domain}:{info['port']}"
+    def print_connection_info(domain, info, message="V2Ray 部署成功!"):
+        # IPv6 地址需要用方括号包裹
+        if ':' in domain:
+            host = f"[{domain}]"
+        else:
+            host = domain
+        link = (f"vless://{info['uuid']}@{host}:{info['port']}"
                 f"?security=reality&sni={info['sni']}&fp=chrome"
                 f"&pbk={info['public_key']}&sid={info['short_id']}"
                 f"&type=tcp&flow=xtls-rprx-vision#NexusVPN")
-        log.success("V2Ray 部署成功!")
+        log.success(message)
         print(f"\nURL: {link}\n")
         try:
             qr = qrcode.QRCode(border=1)
